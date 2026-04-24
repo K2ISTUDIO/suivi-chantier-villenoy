@@ -49,6 +49,32 @@
     margin-top: 4px;
   }
 
+  /* ── save button ── */
+  .save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+    padding: 9px 24px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: .95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s, transform .1s, box-shadow .15s;
+    box-shadow: 0 2px 8px rgba(47,84,150,.25);
+  }
+  .save-btn:hover { background: var(--blue-lt); box-shadow: 0 4px 14px rgba(47,84,150,.3); }
+  .save-btn:active { transform: scale(.97); }
+  .save-btn.saved {
+    background: var(--green);
+    box-shadow: 0 2px 8px rgba(26,122,60,.25);
+    pointer-events: none;
+  }
+
   /* ── summary bar ── */
   #summary-bar {
     display: flex;
@@ -262,6 +288,7 @@
 <header class="site-header">
   <h1>🏗️ Chantier Villenoy</h1>
   <p>Suivi des paiements par corps de métier</p>
+  <button class="save-btn" id="save-btn" onclick="manualSave()">💾 Enregistrer</button>
 </header>
 
 <div id="summary-bar">
@@ -583,6 +610,18 @@ document.getElementById("modal-trade-name").addEventListener("keydown", e => {
   if (e.key === "Enter") confirmAddTrade();
   if (e.key === "Escape") closeModal();
 });
+
+// ── Manual save ──────────────────────────────────────────────────────────────
+function manualSave() {
+  saveData();
+  const btn = document.getElementById("save-btn");
+  btn.classList.add("saved");
+  btn.textContent = "✓ Enregistré";
+  setTimeout(() => {
+    btn.classList.remove("saved");
+    btn.innerHTML = "💾 Enregistrer";
+  }, 2000);
+}
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 render();
