@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chantier Villenoy – Suivi des paiements</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #2F5496;
+    --blue-lt: #4472C4;
+    --blue-bg: #EEF3FB;
+    --green:   #1a7a3c;
+    --green-bg:#e8f5ee;
+    --red:     #c0392b;
+    --red-bg:  #fdecea;
+    --yellow-bg:#fffbea;
+    --border:  #d0d7e8;
+    --text:    #1a1a2e;
+    --muted:   #6c757d;
+    --white:   #ffffff;
+    --radius:  10px;
+    --shadow:  0 2px 12px rgba(47,84,150,.10);
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #f0f4fb;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── header ── */
+  .site-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .site-header h1 {
+    font-size: 1.75rem;
+    color: var(--blue);
+    font-weight: 700;
+    letter-spacing: -.3px;
+  }
+  .site-header p {
+    color: var(--muted);
+    font-size: .95rem;
+    margin-top: 4px;
+  }
+
+  /* ── summary bar ── */
+  #summary-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  .sum-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 24px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    min-width: 180px;
+  }
+  .sum-card .label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .sum-card .amount { font-size: 1.5rem; font-weight: 700; margin-top: 2px; }
+  .sum-card.total  .amount { color: var(--blue); }
+  .sum-card.paid   .amount { color: var(--green); }
+  .sum-card.remain .amount { color: var(--red); }
+
+  /* ── trade sections ── */
+  .trades { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+  .trade-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .trade-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--blue);
+    color: #fff;
+    padding: 14px 20px;
+    gap: 12px;
+  }
+  .trade-header h2 { font-size: 1.05rem; font-weight: 600; }
+  .trade-totals { display: flex; gap: 20px; align-items: center; font-size: .88rem; }
+  .trade-totals .t-paid  { background: rgba(255,255,255,.18); border-radius: 6px; padding: 3px 10px; }
+  .trade-totals .t-total { opacity: .75; }
+
+  /* ── table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th {
+    background: var(--blue-bg);
+    color: var(--blue);
+    font-weight: 600;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+  }
+  th.center, td.center { text-align: center; }
+  th.right,  td.right  { text-align: right; }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f7f9fd; }
+
+  /* paid / unpaid row tint */
+  tr.paid   td { background: var(--green-bg); }
+  tr.unpaid td { background: var(--red-bg); }
+  tr.paid:hover   td { background: #d4edda; }
+  tr.unpaid:hover td { background: #fbd8d5; }
+
+  /* ── checkbox toggle ── */
+  .check-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 600;
+    transition: opacity .15s, transform .1s;
+    white-space: nowrap;
+  }
+  .check-btn:active { transform: scale(.96); }
+  .check-btn.is-paid   { background: var(--green); color: #fff; }
+  .check-btn.is-unpaid { background: #e8ecf5; color: var(--muted); }
+
+  /* ── amount ── */
+  .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ── delete btn ── */
+  .del-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color .15s;
+  }
+  .del-btn:hover { color: var(--red); }
+
+  /* ── add row ── */
+  .add-row td { background: var(--yellow-bg) !important; padding: 8px 12px; }
+  .add-row input, .add-row select {
+    width: 100%;
+    border: 1px solid #d4c97a;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: .88rem;
+    background: #fff;
+    outline: none;
+    font-family: inherit;
+  }
+  .add-row input:focus, .add-row select:focus { border-color: var(--blue-lt); box-shadow: 0 0 0 2px rgba(68,114,196,.2); }
+  .add-row input[type=number] { text-align: right; }
+  .add-btn {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 18px;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .add-btn:hover { background: var(--blue-lt); }
+
+  /* ── add trade section ── */
+  .add-trade-wrap {
+    max-width: 960px;
+    margin: 8px auto 0;
+    text-align: center;
+  }
+  .add-trade-btn {
+    background: var(--white);
+    border: 2px dashed var(--border);
+    color: var(--muted);
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    font-size: .92rem;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    width: 100%;
+    font-family: inherit;
+  }
+  .add-trade-btn:hover { border-color: var(--blue-lt); color: var(--blue); }
+
+  /* ── add trade modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 340px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  }
+  .modal h3 { font-size: 1.1rem; color: var(--blue); margin-bottom: 16px; }
+  .modal input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: .95rem;
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 14px;
+  }
+  .modal input:focus { border-color: var(--blue-lt); box-shadow: 0 0 0 2px rgba(68,114,196,.2); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel {
+    background: #f0f0f0; border: none; border-radius: 6px; padding: 8px 18px;
+    cursor: pointer; font-size: .9rem; font-family: inherit;
+  }
+  .btn-confirm {
+    background: var(--blue); color: #fff; border: none; border-radius: 6px;
+    padding: 8px 18px; cursor: pointer; font-size: .9rem; font-family: inherit; font-weight: 600;
+  }
+  .btn-confirm:hover { background: var(--blue-lt); }
+
+  /* ── responsive ── */
+  @media (max-width: 600px) {
+    .trade-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .site-header h1 { font-size: 1.35rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>🏗️ Chantier Villenoy</h1>
+  <p>Suivi des paiements par corps de métier</p>
+</header>
+
+<div id="summary-bar">
+  <div class="sum-card total">
+    <div class="label">Budget total</div>
+    <div class="amount" id="sum-total">—</div>
+  </div>
+  <div class="sum-card paid">
+    <div class="label">Déjà payé</div>
+    <div class="amount" id="sum-paid">—</div>
+  </div>
+  <div class="sum-card remain">
+    <div class="label">Reste à payer</div>
+    <div class="amount" id="sum-remain">—</div>
+  </div>
+</div>
+
+<div class="trades" id="trades-container"></div>
+
+<div class="add-trade-wrap">
+  <button class="add-trade-btn" onclick="openAddTrade()">+ Ajouter un corps de métier</button>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3>Nouveau corps de métier</h3>
+    <input type="text" id="modal-trade-name" placeholder="Nom (ex: Carreleur)" />
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmAddTrade()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Initial data ────────────────────────────────────────────────────────────
+const DEFAULT_DATA = [
+  {
+    id: "gaulois",
+    name: "Gaulois & Kevin",
+    rows: [
+      { id: "g1", date: "20/04/2026", desc: "Acompte 1",   amount: 7600,  mode: "Espèces",  paid: true,  obs: "" },
+      { id: "g2", date: "11/05/2026", desc: "Acompte 2",   amount: 7600,  mode: "Espèces",  paid: false, obs: "" },
+      { id: "g3", date: "Fin chantier", desc: "Solde",     amount: 10110, mode: "Espèces",  paid: false, obs: "" },
+    ]
+  },
+  {
+    id: "clim",
+    name: "Climatisation",
+    rows: [
+      { id: "c1", date: "20/04/2026", desc: "Acompte 1",   amount: 12000, mode: "Espèces",  paid: true,  obs: "" },
+      { id: "c2", date: "27/04/2026", desc: "Acompte 2",   amount: 4000,  mode: "Espèces",  paid: false, obs: "" },
+      { id: "c3", date: "Fin chantier", desc: "Solde",     amount: 2300,  mode: "Espèces",  paid: false, obs: "" },
+    ]
+  },
+  {
+    id: "plombier",
+    name: "Plombier (Premier devis)",
+    rows: [
+      { id: "p1", date: "20/04/2026", desc: "Acompte 1",   amount: 1490,  mode: "Espèces",  paid: true,  obs: "" },
+      { id: "p2", date: "27/04/2026", desc: "Acompte 2",   amount: 1490,  mode: "Espèces",  paid: false, obs: "" },
+      { id: "p3", date: "Fin chantier", desc: "Solde",     amount: 1970,  mode: "Espèces",  paid: false, obs: "" },
+    ]
+  },
+  {
+    id: "elec",
+    name: "Électricien",
+    rows: [
+      { id: "e1", date: "20/04/2026", desc: "Acompte 1",   amount: 1100,  mode: "Virement", paid: true,  obs: "" },
+      { id: "e2", date: "27/04/2026", desc: "Acompte 2",   amount: 1780,  mode: "Virement", paid: false, obs: "" },
+      { id: "e3", date: "Fin chantier", desc: "Solde",     amount: 7500,  mode: "Espèces",  paid: false, obs: "" },
+    ]
+  }
+];
+
+// ── State ───────────────────────────────────────────────────────────────────
+function loadData() {
+  try {
+    const saved = localStorage.getItem("villenoy_v2");
+    return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+  } catch { return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+}
+function saveData() {
+  localStorage.setItem("villenoy_v2", JSON.stringify(state));
+}
+let state = loadData();
+
+// ── Formatting ──────────────────────────────────────────────────────────────
+function fmt(n) {
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  renderSummary();
+  renderTrades();
+}
+
+function renderSummary() {
+  let total = 0, paid = 0;
+  state.forEach(t => t.rows.forEach(r => {
+    total += r.amount || 0;
+    if (r.paid) paid += r.amount || 0;
+  }));
+  document.getElementById("sum-total").textContent  = fmt(total);
+  document.getElementById("sum-paid").textContent   = fmt(paid);
+  document.getElementById("sum-remain").textContent = fmt(total - paid);
+}
+
+function renderTrades() {
+  const container = document.getElementById("trades-container");
+  container.innerHTML = "";
+  state.forEach(trade => container.appendChild(buildTradeCard(trade)));
+}
+
+function buildTradeCard(trade) {
+  const total = trade.rows.reduce((s, r) => s + (r.amount || 0), 0);
+  const paid  = trade.rows.filter(r => r.paid).reduce((s, r) => s + (r.amount || 0), 0);
+
+  const card = document.createElement("div");
+  card.className = "trade-card";
+  card.id = "trade-" + trade.id;
+
+  card.innerHTML = `
+    <div class="trade-header">
+      <h2>${esc(trade.name)}</h2>
+      <div class="trade-totals">
+        <span class="t-paid">✓ ${fmt(paid)} payé</span>
+        <span class="t-total">/ ${fmt(total)}</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th class="right">Montant</th>
+            <th class="center">Mode</th>
+            <th class="center">Payé ✓</th>
+            <th>Observation</th>
+            <th class="center">×</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-${trade.id}"></tbody>
+      </table>
+    </div>`;
+
+  const tbody = card.querySelector(`#tbody-${trade.id}`);
+
+  trade.rows.forEach(row => {
+    tbody.appendChild(buildRow(trade.id, row));
+  });
+
+  // add-row
+  const addTr = document.createElement("tr");
+  addTr.className = "add-row";
+  addTr.id = "add-row-" + trade.id;
+  addTr.innerHTML = `
+    <td><input type="text" placeholder="Date" id="in-date-${trade.id}" /></td>
+    <td><input type="text" placeholder="Description" id="in-desc-${trade.id}" /></td>
+    <td><input type="number" placeholder="0" id="in-amt-${trade.id}" min="0" /></td>
+    <td>
+      <select id="in-mode-${trade.id}">
+        <option value="Espèces">Espèces</option>
+        <option value="Virement">Virement</option>
+        <option value="Chèque">Chèque</option>
+        <option value="CB">CB</option>
+      </select>
+    </td>
+    <td class="center">
+      <select id="in-paid-${trade.id}">
+        <option value="false">Non</option>
+        <option value="true">Oui</option>
+      </select>
+    </td>
+    <td><input type="text" placeholder="Observation" id="in-obs-${trade.id}" /></td>
+    <td class="center">
+      <button class="add-btn" onclick="addRow('${trade.id}')">+ Ajouter</button>
+    </td>`;
+  tbody.appendChild(addTr);
+
+  // enter key on any input in add-row triggers addRow
+  addTr.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") addRow(trade.id); });
+  });
+
+  return card;
+}
+
+function buildRow(tradeId, row) {
+  const tr = document.createElement("tr");
+  tr.id = "row-" + row.id;
+  tr.className = row.paid ? "paid" : "unpaid";
+
+  tr.innerHTML = `
+    <td>${esc(row.date)}</td>
+    <td>${esc(row.desc)}</td>
+    <td class="right amount-cell">${fmt(row.amount)}</td>
+    <td class="center">${esc(row.mode)}</td>
+    <td class="center">
+      <button class="check-btn ${row.paid ? 'is-paid' : 'is-unpaid'}"
+              onclick="togglePaid('${tradeId}', '${row.id}')">
+        ${row.paid ? '✓ Payé' : '○ Non payé'}
+      </button>
+    </td>
+    <td>
+      <input type="text" value="${esc(row.obs)}" placeholder="—"
+             style="border:none;background:transparent;width:100%;font-family:inherit;font-size:.9rem;color:var(--text);"
+             onchange="updateObs('${tradeId}','${row.id}',this.value)" />
+    </td>
+    <td class="center">
+      <button class="del-btn" onclick="deleteRow('${tradeId}','${row.id}')" title="Supprimer">✕</button>
+    </td>`;
+  return tr;
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+function togglePaid(tradeId, rowId) {
+  const trade = state.find(t => t.id === tradeId);
+  const row   = trade.rows.find(r => r.id === rowId);
+  row.paid = !row.paid;
+  saveData();
+  // partial re-render: just update the row + header totals
+  const oldTr = document.getElementById("row-" + rowId);
+  const newTr = buildRow(tradeId, row);
+  oldTr.replaceWith(newTr);
+  updateTradeHeader(trade);
+  renderSummary();
+}
+
+function updateObs(tradeId, rowId, value) {
+  const trade = state.find(t => t.id === tradeId);
+  const row   = trade.rows.find(r => r.id === rowId);
+  row.obs = value;
+  saveData();
+}
+
+function deleteRow(tradeId, rowId) {
+  const trade = state.find(t => t.id === tradeId);
+  trade.rows = trade.rows.filter(r => r.id !== rowId);
+  saveData();
+  document.getElementById("row-" + rowId)?.remove();
+  updateTradeHeader(trade);
+  renderSummary();
+}
+
+function addRow(tradeId) {
+  const date = document.getElementById(`in-date-${tradeId}`).value.trim();
+  const desc = document.getElementById(`in-desc-${tradeId}`).value.trim();
+  const amt  = parseFloat(document.getElementById(`in-amt-${tradeId}`).value) || 0;
+  const mode = document.getElementById(`in-mode-${tradeId}`).value;
+  const paid = document.getElementById(`in-paid-${tradeId}`).value === "true";
+  const obs  = document.getElementById(`in-obs-${tradeId}`).value.trim();
+
+  if (!date && !desc && !amt) return;
+
+  const trade = state.find(t => t.id === tradeId);
+  const newRow = { id: uid(), date: date || "—", desc: desc || "—", amount: amt, mode, paid, obs };
+  trade.rows.push(newRow);
+  saveData();
+
+  // insert before add-row
+  const addTr = document.getElementById("add-row-" + tradeId);
+  const newTr = buildRow(tradeId, newRow);
+  addTr.parentNode.insertBefore(newTr, addTr);
+
+  // clear inputs
+  document.getElementById(`in-date-${tradeId}`).value = "";
+  document.getElementById(`in-desc-${tradeId}`).value = "";
+  document.getElementById(`in-amt-${tradeId}`).value  = "";
+  document.getElementById(`in-obs-${tradeId}`).value  = "";
+  document.getElementById(`in-paid-${tradeId}`).value = "false";
+
+  updateTradeHeader(trade);
+  renderSummary();
+}
+
+function updateTradeHeader(trade) {
+  const total = trade.rows.reduce((s, r) => s + (r.amount || 0), 0);
+  const paid  = trade.rows.filter(r => r.paid).reduce((s, r) => s + (r.amount || 0), 0);
+  const card  = document.getElementById("trade-" + trade.id);
+  if (!card) return;
+  card.querySelector(".t-paid").textContent  = `✓ ${fmt(paid)} payé`;
+  card.querySelector(".t-total").textContent = `/ ${fmt(total)}`;
+}
+
+// ── Add Trade ────────────────────────────────────────────────────────────────
+function openAddTrade() {
+  document.getElementById("modal-trade-name").value = "";
+  document.getElementById("modal-overlay").classList.add("open");
+  setTimeout(() => document.getElementById("modal-trade-name").focus(), 50);
+}
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("open");
+}
+function confirmAddTrade() {
+  const name = document.getElementById("modal-trade-name").value.trim();
+  if (!name) return;
+  const newTrade = { id: uid(), name, rows: [] };
+  state.push(newTrade);
+  saveData();
+  const container = document.getElementById("trades-container");
+  container.appendChild(buildTradeCard(newTrade));
+  renderSummary();
+  closeModal();
+}
+
+document.getElementById("modal-overlay").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.getElementById("modal-trade-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") confirmAddTrade();
+  if (e.key === "Escape") closeModal();
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
