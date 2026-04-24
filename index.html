@@ -366,16 +366,35 @@ const DEFAULT_DATA = [
 ];
 
 // ── State ───────────────────────────────────────────────────────────────────
-function loadData() {
+let state = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+async function loadData() {
   try {
+    const res = await fetch("/api/data");
+    const data = await res.json();
+    if (data && Array.isArray(data)) {
+      state = data;
+    }
+  } catch {
+    // offline fallback: localStorage
     const saved = localStorage.getItem("villenoy_v2");
-    return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_DATA));
-  } catch { return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+    if (saved) state = JSON.parse(saved);
+  }
 }
-function saveData() {
+
+async function saveData() {
+  // optimistic local save
   localStorage.setItem("villenoy_v2", JSON.stringify(state));
+  try {
+    await fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+  } catch {
+    // silently fail if offline
+  }
 }
-let state = loadData();
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 function fmt(n) {
@@ -612,19 +631,32 @@ document.getElementById("modal-trade-name").addEventListener("keydown", e => {
 });
 
 // ── Manual save ──────────────────────────────────────────────────────────────
-function manualSave() {
-  saveData();
+async function manualSave() {
   const btn = document.getElementById("save-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Envoi…";
+  await saveData();
   btn.classList.add("saved");
   btn.textContent = "✓ Enregistré";
   setTimeout(() => {
     btn.classList.remove("saved");
+    btn.disabled = false;
     btn.innerHTML = "💾 Enregistrer";
   }, 2000);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
-render();
+async function boot() {
+  const loader = document.createElement("div");
+  loader.style.cssText = "text-align:center;padding:40px;color:#6c757d;font-size:1rem;";
+  loader.textContent = "Chargement des données…";
+  document.getElementById("trades-container").appendChild(loader);
+
+  await loadData();
+  loader.remove();
+  render();
+}
+boot();
 </script>
 </body>
 </html>
